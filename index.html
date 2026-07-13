@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบบริหารจัดการเครื่องช่วยหายใจ</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root { var(--color-cream): #FDFBF7; --color-blue: #4A90E2; --color-red: #E74C3C; --text-dark: #333333; }
+        body { font-family: 'Prompt', sans-serif; background-color: #FDFBF7; color: var(--text-dark); margin: 0; padding: 30px; }
+
+        .header-container { display: flex; align-items: center; margin-bottom: 20px; background-color: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 5px solid var(--color-blue); }
+        .hospital-logo { width: 80px; height: 80px; object-fit: contain; margin-right: 20px; }
+        h1 { color: var(--color-blue); margin: 0; font-size: 28px; font-weight: 600; }
+        h2 { margin-top: 30px; margin-bottom: 15px; font-size: 20px; border-left: 5px solid; padding-left: 10px; }
+        .h2-blue { color: var(--color-blue); border-left-color: var(--color-blue); }
+        .h2-red { color: var(--color-red); border-left-color: var(--color-red); }
+        .h2-gray { color: #5D6D7E; border-left-color: #5D6D7E; }
+
+        .search-container { margin-bottom: 25px; text-align: right; }
+        .search-box { font-family: 'Prompt', sans-serif; padding: 10px 15px; width: 100%; max-width: 350px; border: 2px solid #E0E0E0; border-radius: 8px; font-size: 16px; transition: 0.3s; }
+        .search-box:focus { border-color: var(--color-blue); outline: none; }
+
+        .table-responsive { overflow-x: auto; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        table { width: 100%; border-collapse: collapse; min-width: 850px; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #EEEEEE; vertical-align: middle; }
+        th { background-color: var(--color-blue); color: white; font-weight: 500; white-space: nowrap; }
+        .table-red th { background-color: var(--color-red); }
+        .table-gray th { background-color: #5D6D7E; }
+        tr:hover { background-color: #F8F9FA; }
+        
+        .prepped-row { background-color: #EBF5FB; }
+        
+        .status-badge { padding: 6px 12px; border-radius: 20px; font-size: 0.85em; font-weight: 500; display: inline-block; white-space: nowrap; }
+        .status-normal { background-color: #E8F8F5; color: #117A65; } 
+        .status-warning { background-color: #FEF9E7; color: #D4AC0D; } 
+        .status-danger { background-color: #FDEDEC; color: #E74C3C; } 
+        .status-none { background-color: #F2F4F4; color: #7F8C8D; }
+        .status-broken { background-color: #34495E; color: white; }
+        
+        .text-center { text-align: center; }
+        .info-text { color: #555; font-size: 0.85em; margin-top: 4px; display: block; }
+
+        .action-flex { display: flex; align-items: center; gap: 8px; justify-content: center; }
+        .date-input { font-family: 'Prompt', sans-serif; padding: 6px; border: 1px solid #CCCCCC; border-radius: 4px; font-size: 0.9em; }
+
+        .btn { padding: 7px 14px; border: none; border-radius: 6px; cursor: pointer; font-family: 'Prompt', sans-serif; font-weight: 500; font-size: 0.9em; transition: 0.2s; white-space: nowrap; }
+        .btn-use { background-color: var(--color-blue); color: white; }
+        .btn-charge { background-color: white; color: var(--color-red); border: 1px solid var(--color-red); }
+        .btn-edit { background-color: #F39C12; color: white; padding: 5px 10px; font-size: 0.8em; margin-top: 6px; }
+        .btn:hover { filter: brightness(0.9); }
+
+        /* Modal */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 25px; border-radius: 12px; width: 90%; max-width: 500px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .modal-header { font-size: 1.2em; font-weight: bold; color: var(--color-blue); margin-bottom: 15px; border-bottom: 2px solid #EEE; padding-bottom: 10px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-weight: 500; margin-bottom: 5px; font-size: 0.95em; }
+        .form-group input, .form-group select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-family: 'Prompt', sans-serif; box-sizing: border-box; }
+        .close-btn { color: #aaa; float: right; font-size: 24px; font-weight: bold; cursor: pointer; margin-top: -5px; }
+        .close-btn:hover { color: red; }
+    </style>
+</head>
+<body>
+
+    <div class="header-container">
+        <img src="https://lh3.googleusercontent.com/d/1DlsLtw43ZhgFrmvjS6ySFH4EmSwuS0tk" alt="โลโก้" class="hospital-logo">
+        <div>
+            <h1>ระบบบริหารจัดการเครื่องช่วยหายใจ</h1>
+            <p style="margin: 5px 0 0 0; color: #666;">ศูนย์เครื่องมือแพทย์ (ระบบคิวเตรียมเครื่องและชาร์จกระตุ้นแบตเตอรี่)</p>
+        </div>
+    </div>
+
+    <div class="search-container">
+        <input type="text" id="searchInput" class="search-box" placeholder="🔍 ค้นหาเลขครุภัณฑ์, Serial หรือรุ่นเครื่อง..." onkeyup="searchData()">
+    </div>
+    
+    <div>
+        <h2 class="h2-blue">🔵 ลำดับที่ควรหยิบไปต่อเครื่อง (เครื่องพร้อมใช้)</h2>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th width="8%" class="text-center">คิว</th>
+                        <th width="30%">ข้อมูลครุภัณฑ์ / รุ่นเครื่อง</th>
+                        <th width="20%">วันที่เตรียมล่าสุด</th>
+                        <th width="20%">สถานะ (จอดสแตนด์บาย)</th>
+                        <th width="22%" class="text-center">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody id="use-list"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div>
+        <h2 class="h2-red">🔴 ลำดับที่ต้องชาร์จกระตุ้นแบตเตอรี่ (เครื่องพร้อมใช้)</h2>
+        <div class="table-responsive">
+            <table class="table-red">
+                <thead>
+                    <tr>
+                        <th width="8%" class="text-center">คิว</th>
+                        <th width="30%">ข้อมูลครุภัณฑ์ / รุ่นเครื่อง</th>
+                        <th width="20%">วันที่ชาร์จล่าสุด</th>
+                        <th width="20%">สถานะ (การชาร์จ)</th>
+                        <th width="22%" class="text-center">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody id="charge-list"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div>
+        <h2 class="h2-gray">⚫ เครื่องที่ชำรุด / ส่งซ่อม</h2>
+        <div class="table-responsive">
+            <table class="table-gray">
+                <thead>
+                    <tr>
+                        <th width="25%">เลขครุภัณฑ์ / รุ่นเครื่อง</th>
+                        <th width="30%">อาการชำรุด / หมายเหตุ</th>
+                        <th width="25%">ข้อมูลอายุเครื่อง</th>
+                        <th width="20%" class="text-center">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody id="broken-list"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <div class="modal-header">⚙️ แก้ไขข้อมูลประจำเครื่อง <span id="modal-asset"></span></div>
+            
+            <input type="hidden" id="modal-id">
+            
+            <div class="form-group">
+                <label>รุ่นเครื่องช่วยหายใจ (Model):</label>
+                <input type="text" id="modal-model" placeholder="เช่น Puritan Bennett 840, Evita V300...">
+            </div>
+
+            <div class="form-group">
+                <label>สถานะเครื่อง:</label>
+                <select id="modal-status" onchange="toggleSymptom()">
+                    <option value="Ready">✔️ พร้อมใช้งาน (Ready)</option>
+                    <option value="Broken">❌ ชำรุด / ส่งซ่อม (Broken)</option>
+                </select>
+            </div>
+            
+            <div class="form-group" id="symptom-group" style="display:none;">
+                <label>อาการชำรุด:</label>
+                <input type="text" id="modal-symptom" placeholder="ระบุอาการชำรุด...">
+            </div>
+            
+            <div class="form-group">
+                <label>วันที่รับเครื่อง (คำนวณอายุเครื่อง):</label>
+                <input type="date" id="modal-receive">
+            </div>
+            
+            <div class="form-group">
+                <label>วันที่เปลี่ยนแบตเตอรี่ล่าสุด (คำนวณอายุแบต):</label>
+                <input type="date" id="modal-battery">
+            </div>
+            
+            <button class="btn btn-use" style="width:100%; margin-top:10px;" onclick="saveMachineInfo()" id="btn-save-modal">บันทึกข้อมูล</button>
+        </div>
+    </div>
+
+    <script>
+        // ⭐️ เปลี่ยนเป็น API URL ของคุณ ⭐️
+        const API_URL = 'https://script.google.com/macros/s/AKfycbxUISoKM4RLt5T9dnjN86-Q5WCEbytq5GhHJArvP3Azv0FhhYemSYvi9IbU6cVd2-R3Lw/exec';
+        
+        let globalData = [];
+
+        function getTodayString() {
+            const today = new Date();
+            const offset = today.getTimezoneOffset();
+            return new Date(today.getTime() - (offset * 60 * 1000)).toISOString().split('T')[0];
+        }
+
+        async function fetchData() {
+            try {
+                const response = await fetch(API_URL + "?t=" + new Date().getTime());
+                globalData = await response.json();
+                searchData();
+            } catch (error) { console.error("Error:", error); }
+        }
+
+        // ค้นหาครอบคลุม เลขครุภัณฑ์, Serial และรุ่นเครื่อง
+        function searchData() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const filteredData = globalData.filter(item => {
+                const assetId = (item.AssetID || '').toString().toLowerCase();
+                const serial = (item.SerialNumber || '').toString().toLowerCase();
+                const model = (item.Model || '').toString().toLowerCase();
+                return assetId.includes(query) || serial.includes(query) || model.includes(query);
+            });
+            processData(filteredData);
+        }
+
+        function calculateAgeText(dateString) {
+            if (!dateString) return "ไม่มีข้อมูล";
+            const d = new Date(dateString);
+            if (isNaN(d)) return "ไม่มีข้อมูล";
+            
+            const today = new Date();
+            let years = today.getFullYear() - d.getFullYear();
+            let months = today.getMonth() - d.getMonth();
+            if (months < 0 || (months === 0 && today.getDate() < d.getDate())) {
+                years--; months += 12;
+            }
+            if(years === 0 && months === 0) return "เพิ่งเปลี่ยน/รับมา";
+            return `${years > 0 ? years + ' ปี ' : ''}${months > 0 ? months + ' เดือน' : ''}`;
+        }
+
+        function getDaysSince(dateString) {
+            if (!dateString) return 9999;
+            const targetDate = new Date(dateString);
+            if (isNaN(targetDate)) return 9999;
+            const today = new Date();
+            today.setHours(0,0,0,0); targetDate.setHours(0,0,0,0);
+            return Math.floor((today - targetDate) / (1000 * 60 * 60 * 24));
+        }
+
+        function formatDate(dateString, type) {
+            if (!dateString) return type === 'use' ? "เครื่องใหม่ (ยังไม่เคยเตรียม)" : "-";
+            const d = new Date(dateString);
+            if (isNaN(d)) return dateString;
+            return d.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
+        function getAlertBadge(days) {
+            if (days === 9999) return `<span class="status-badge status-none">ไม่มีประวัติ</span>`;
+            if (days >= 30) return `<span class="status-badge status-danger">ผ่านมา ${days} วัน (เกิน 1 เดือน) 🔴</span>`;
+            if (days >= 7) return `<span class="status-badge status-warning">ผ่านมา ${days} วัน (เกิน 1 สัปดาห์) 🟠</span>`;
+            return `<span class="status-badge status-normal">ผ่านมา ${days} วัน 🟢</span>`;
+        }
+
+        function openModal(assetId) {
+            const item = globalData.find(m => m.AssetID == assetId);
+            if(!item) return;
+
+            document.getElementById('modal-id').value = item.AssetID;
+            document.getElementById('modal-asset').innerText = `[${item.AssetID}]`;
+            document.getElementById('modal-model').value = item.Model || '';
+            document.getElementById('modal-status').value = (item.Status === 'Broken') ? 'Broken' : 'Ready';
+            document.getElementById('modal-symptom').value = item.Symptom || '';
+            
+            document.getElementById('modal-receive').value = item.ReceiveDate ? new Date(item.ReceiveDate).toISOString().split('T')[0] : '';
+            document.getElementById('modal-battery').value = item.BatteryDate ? new Date(item.BatteryDate).toISOString().split('T')[0] : '';
+            
+            toggleSymptom();
+            document.getElementById('editModal').style.display = 'block';
+        }
+
+        function closeModal() { document.getElementById('editModal').style.display = 'none'; }
+        function toggleSymptom() {
+            const status = document.getElementById('modal-status').value;
+            document.getElementById('symptom-group').style.display = (status === 'Broken') ? 'block' : 'none';
+        }
+
+        async function saveMachineInfo() {
+            const id = document.getElementById('modal-id').value;
+            const model = document.getElementById('modal-model').value;
+            const status = document.getElementById('modal-status').value;
+            const symptom = document.getElementById('modal-symptom').value;
+            const receive = document.getElementById('modal-receive').value;
+            const battery = document.getElementById('modal-battery').value;
+            
+            const btn = document.getElementById('btn-save-modal');
+            btn.innerText = "กำลังบันทึก..."; btn.disabled = true;
+
+            try {
+                const targetUrl = `${API_URL}?action=update_info&id=${id}&model=${encodeURIComponent(model)}&status=${status}&symptom=${encodeURIComponent(symptom)}&receivedate=${receive}&batterydate=${battery}`;
+                await fetch(targetUrl);
+                closeModal();
+                await fetchData(); 
+            } catch (error) { alert("เกิดข้อผิดพลาด"); }
+            btn.innerText = "บันทึกข้อมูล"; btn.disabled = false;
+        }
+
+        async function actionUpdate(assetId, actionType, buttonElement, inputId) {
+            const selectedDate = document.getElementById(inputId).value;
+            if(!selectedDate) { alert("กรุณาเลือกวันที่"); return; }
+            if (!confirm(`ยืนยันการบันทึกข้อมูลใช่หรือไม่?`)) return;
+
+            const originalText = buttonElement.innerText;
+            buttonElement.innerText = "กำลังบันทึก..."; buttonElement.disabled = true;
+
+            try {
+                await fetch(`${API_URL}?action=${actionType}&id=${assetId}&date=${selectedDate}`);
+                await fetchData(); 
+            } catch (error) { alert("เกิดข้อผิดพลาด"); buttonElement.innerText = originalText; buttonElement.disabled = false; }
+        }
+
+        function getMachineInfoHTML(item) {
+            return `
+                <strong>${item.AssetID || '-'}</strong> <small style="color:#666;">(SN: ${item.SerialNumber || '-'})</small>
+                <span class="info-text" style="color:var(--color-blue); font-weight:500;">📝 รุ่น: ${item.Model || 'ยังไม่ระบุรุ่น'}</span>
+                <span class="info-text">⚙️ อายุเครื่อง: ${calculateAgeText(item.ReceiveDate)} | 🔋 อายุแบต: ${calculateAgeText(item.BatteryDate)}</span>
+                <button class="btn btn-edit" onclick="openModal('${item.AssetID}')">✏️ แก้ไขข้อมูล / รุ่น</button>
+            `;
+        }
+
+        function processData(data) {
+            const readyMachines = data.filter(m => m.Status !== 'Broken');
+            const brokenMachines = data.filter(m => m.Status === 'Broken');
+
+            const useData = readyMachines.map(m => ({ ...m, daysSinceUse: getDaysSince(m.StartDate) }));
+            const useFirst = useData.sort((a, b) => (new Date(a.StartDate||0)) - (new Date(b.StartDate||0)));
+            
+            const chargeData = readyMachines.map(m => ({ ...m, daysSinceCharge: getDaysSince(m.LastCharged) }));
+            const chargeFirst = chargeData.sort((a, b) => b.daysSinceCharge - a.daysSinceCharge);
+
+            renderUseTable(useFirst);
+            renderChargeTable(chargeFirst);
+            renderBrokenTable(brokenMachines);
+        }
+
+        function renderUseTable(items) {
+            const tbody = document.getElementById('use-list');
+            if(items.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center">ไม่มีข้อมูล</td></tr>'; return; }
+            const todayStr = getTodayString(); tbody.innerHTML = '';
+            
+            items.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                let isPreppedToday = item.StartDate && (new Date().toDateString() === new Date(item.StartDate).toDateString());
+                if (isPreppedToday) tr.className = 'prepped-row';
+
+                const inputId = `date-use-${item.AssetID}`;
+                const statusBadge = isPreppedToday ? `<span class="status-badge status-none">เพิ่งเตรียมวันนี้ ✔️</span>` : getAlertBadge(item.daysSinceUse);
+
+                tr.innerHTML = `
+                    <td class="text-center"><strong>${index + 1}</strong></td>
+                    <td>${getMachineInfoHTML(item)}</td>
+                    <td>${formatDate(item.StartDate, 'use')}</td>
+                    <td>${statusBadge}</td>
+                    <td class="text-center">
+                        <div class="action-flex">
+                            <input type="date" id="${inputId}" class="date-input" value="${todayStr}">
+                            <button class="btn btn-use" onclick="actionUpdate('${item.AssetID}', 'use', this, '${inputId}')">บันทึกเตรียม</button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderChargeTable(items) {
+            const tbody = document.getElementById('charge-list');
+            if(items.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center">ไม่มีข้อมูล</td></tr>'; return; }
+            const todayStr = getTodayString(); tbody.innerHTML = '';
+            
+            items.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                if(item.daysSinceCharge >= 30 && item.daysSinceCharge !== 9999) tr.style.backgroundColor = '#FFF3F2';
+
+                const inputId = `date-charge-${item.AssetID}`;
+                tr.innerHTML = `
+                    <td class="text-center"><strong>${index + 1}</strong></td>
+                    <td>${getMachineInfoHTML(item)}</td>
+                    <td>${formatDate(item.LastCharged, 'charge')}</td>
+                    <td>${getAlertBadge(item.daysSinceCharge)}</td>
+                    <td class="text-center">
+                        <div class="action-flex">
+                            <input type="date" id="${inputId}" class="date-input" value="${todayStr}">
+                            <button class="btn btn-charge" onclick="actionUpdate('${item.AssetID}', 'charge', this, '${inputId}')">บันทึกชาร์จ</button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderBrokenTable(items) {
+            const tbody = document.getElementById('broken-list');
+            if(items.length === 0) { tbody.innerHTML = '<tr><td colspan="4" class="text-center">ไม่มีเครื่องชำรุดในระบบ 🎉</td></tr>'; return; }
+            tbody.innerHTML = '';
+            
+            items.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${item.AssetID || '-'}</strong><br><small style="color:var(--color-blue)">รุ่น: ${item.Model || '-'}</small><br><small style="color:#777;">SN: ${item.SerialNumber || '-'}</small></td>
+                    <td><span class="status-badge status-broken">ชำรุด</span><br><span style="color:var(--color-red); font-weight:500;">${item.Symptom || 'ไม่ระบุอาการ'}</span></td>
+                    <td><span class="info-text">อายุเครื่อง: ${calculateAgeText(item.ReceiveDate)}</span><span class="info-text">อายุแบต: ${calculateAgeText(item.BatteryDate)}</span></td>
+                    <td class="text-center"><button class="btn btn-edit" onclick="openModal('${item.AssetID}')">✏️ อัปเดตสถานะ</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        fetchData();
+    </script>
+</body>
+</html>
