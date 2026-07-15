@@ -43,9 +43,9 @@
         .btn-edit { background-color: #F39C12; color: white; padding: 4px 8px; font-size: 0.8em; margin-top: 4px; }
         .btn-history { background-color: #2ECC71; color: white; padding: 4px 8px; font-size: 0.8em; margin-top: 4px; margin-left: 4px; }
         
-        /* Modal */
+        /* Modal หน้าต่างป๊อปอัป */
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); overflow-y: auto; }
-        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 25px; border-radius: 12px; width: 90%; max-width: 650px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .modal-content { background-color: #fefefe; margin: 4% auto; padding: 25px; border-radius: 12px; width: 92%; max-width: 750px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
         .modal-header { font-size: 1.2em; font-weight: bold; color: var(--color-blue); margin-bottom: 15px; border-bottom: 2px solid #EEE; padding-bottom: 10px; }
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; font-weight: 500; margin-bottom: 5px; }
@@ -59,6 +59,9 @@
         .stat-card div { font-size: 1.5em; font-weight: bold; color: var(--color-blue); }
         .stat-card.sc-red div { color: var(--color-red); }
         .stat-card.sc-green div { color: #2ECC71; }
+
+        /* หัวข้อตารางย่อยในประวัติ */
+        .history-sub-title { font-size: 1.05em; font-weight: 600; margin-top: 20px; margin-bottom: 10px; padding-left: 6px; }
     </style>
 </head>
 <body>
@@ -151,15 +154,15 @@
             <input type="hidden" id="history-asset-id">
             
             <div class="stats-grid">
-                <div class="stat-card">📑 เตรียมเครื่องแล้ว<div id="stat-use-count">0</div>ครั้ง</div>
-                <div class="stat-card sc-red">🔌 ชาร์จกระตุ้นแล้ว<div id="stat-charge-count">0</div>ครั้ง</div>
-                <div class="stat-card sc-green">🔋 เปลี่ยนแบตแล้ว<div id="stat-battery-count">0</div>ครั้ง</div>
+                <div class="stat-card">🔵 เตรียมเครื่องแล้ว<div id="stat-use-count">0</div>ครั้ง</div>
+                <div class="stat-card sc-red">🔴 ชาร์จกระตุ้นแล้ว<div id="stat-charge-count">0</div>ครั้ง</div>
+                <div class="stat-card sc-green">🟢 เปลี่ยนแบตแล้ว<div id="stat-battery-count">0</div>ครั้ง</div>
             </div>
 
-            <fieldset style="border: 1px solid #DDD; border-radius: 8px; margin-bottom: 20px; padding: 15px;">
-                <legend style="font-weight:600; color:var(--color-blue);">➕ บันทึกกิจกรรมย้อนหลังเข้าระบบ</legend>
+            <fieldset style="border: 1px solid #DDD; border-radius: 8px; margin-bottom: 25px; padding: 15px;">
+                <legend style="font-weight:600; color:var(--color-blue);">➕ ลงบันทึกประวัติกิจกรรมย้อนหลังเข้าระบบ</legend>
                 <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; align-items:end;">
-                    <div><label style="font-size:0.85em; font-weight:500;">ประเภท:</label>
+                    <div><label style="font-size:0.85em; font-weight:500;">ประเภทประวัติ:</label>
                         <select id="new-log-type">
                             <option value="use">🔵 นำออกไปเตรียมเครื่อง</option>
                             <option value="charge">🔴 เสียบชาร์จกระตุ้น</option>
@@ -171,20 +174,48 @@
                 </div>
             </fieldset>
 
-            <h3>รายการบันทึกประวัติทั้งหมด</h3>
-            <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+            <div class="history-sub-title" style="color: var(--color-blue); border-left: 4px solid var(--color-blue);">🔵 ประวัติการนำออกไปเตรียมเครื่อง</div>
+            <div class="table-responsive" style="max-height: 160px; overflow-y: auto;">
                 <table style="min-width: 100%;">
                     <thead>
-                        <tr style="background:#F2F4F4; color:#333;">
-                            <th width="25%">วันที่ปฏิบัติงาน</th>
-                            <th width="25%">กิจกรรม</th>
-                            <th width="30%">หมายเหตุ/รายละเอียด</th>
+                        <tr style="background:#EBF5FB; color:#333;">
+                            <th width="30%">วันที่ปฏิบัติงาน</th>
+                            <th width="50%">รายละเอียด</th>
                             <th width="20%" class="text-center">จัดการ</th>
                         </tr>
                     </thead>
-                    <tbody id="log-history-rows"></tbody>
+                    <tbody id="log-use-rows"></tbody>
                 </table>
             </div>
+
+            <div class="history-sub-title" style="color: var(--color-red); border-left: 4px solid var(--color-red);">🔴 ประวัติการเสียบชาร์จกระตุ้นแบตเตอรี่</div>
+            <div class="table-responsive" style="max-height: 160px; overflow-y: auto;">
+                <table style="min-width: 100%;">
+                    <thead>
+                        <tr style="background:#FFF3F2; color:#333;">
+                            <th width="30%">วันที่ปฏิบัติงาน</th>
+                            <th width="50%">รายละเอียด</th>
+                            <th width="20%" class="text-center">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="log-charge-rows"></tbody>
+                </table>
+            </div>
+
+            <div class="history-sub-title" style="color: #2ECC71; border-left: 4px solid #2ECC71;">🟢 ประวัติการเปลี่ยนแบตเตอรี่ใหม่</div>
+            <div class="table-responsive" style="max-height: 160px; overflow-y: auto;">
+                <table style="min-width: 100%;">
+                    <thead>
+                        <tr style="background:#E8F8F5; color:#333;">
+                            <th width="30%">วันที่ปฏิบัติงาน</th>
+                            <th width="50%">รายละเอียด</th>
+                            <th width="20%" class="text-center">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="log-battery-rows"></tbody>
+                </table>
+            </div>
+
         </div>
     </div>
 
@@ -252,7 +283,6 @@
             return `<span class="status-badge status-normal">ผ่านมา ${days} วัน 🟢</span>`;
         }
 
-        // === เปิด/ปิดหน้าต่างข้อความ ===
         function openEditModal(assetId) {
             const item = globalData.find(m => m.AssetID == assetId);
             if(!item) return;
@@ -287,7 +317,7 @@
             } catch (error) { alert("เกิดข้อผิดพลาด"); }
         }
 
-        // === 📜 ฟังก์ชันหลักการจัดการระบบประวัติย้อนหลังและสถิติความถี่ ===
+        // === 📜 ระบบจัดการประวัติย้อนหลัง แบบแยกออกเป็น 3 ตาราง ===
         async function openHistoryModal(assetId) {
             document.getElementById('history-asset-id').value = assetId;
             document.getElementById('history-asset-title').innerText = `[${assetId}]`;
@@ -296,50 +326,72 @@
             await fetchLogHistory(assetId);
         }
 
+        // ฟังก์ชันช่วยสร้างแถวประวัติ (ใช้ร่วมกันทั้ง 3 ตาราง)
+        function createLogRowHTML(log) {
+            const tr = document.createElement('tr');
+            tr.id = `log-row-${log.rowIndex}`;
+            tr.innerHTML = `
+                <td>${new Date(log.Date).toLocaleDateString('th-TH')}</td>
+                <td>${log.Notes || '-'}</td>
+                <td class="text-center">
+                    <button class="btn btn-edit" style="padding:2px 6px; font-size:0.75em;" onclick="inlineEditLog('${log.AssetID}', ${log.rowIndex}, '${log.Date.split('T')[0]}', '${log.Notes}')">แก้ไข</button>
+                    <button class="btn btn-charge" style="padding:2px 6px; font-size:0.75em;" onclick="deleteLogEntry('${log.AssetID}', ${log.rowIndex})">ลบ</button>
+                </td>
+            `;
+            return tr;
+        }
+
         async function fetchLogHistory(assetId) {
-            const tbody = document.getElementById('log-history-rows');
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center">กำลังเรียกประวัติ...</td></tr>';
+            const tbodyUse = document.getElementById('log-use-rows');
+            const tbodyCharge = document.getElementById('log-charge-rows');
+            const tbodyBattery = document.getElementById('log-battery-rows');
+            
+            tbodyUse.innerHTML = '<tr><td colspan="3" class="text-center">กำลังเรียกประวัติ...</td></tr>';
+            tbodyCharge.innerHTML = '<tr><td colspan="3" class="text-center">กำลังเรียกประวัติ...</td></tr>';
+            tbodyBattery.innerHTML = '<tr><td colspan="3" class="text-center">กำลังเรียกประวัติ...</td></tr>';
             
             try {
                 const response = await fetch(`${API_URL}?action=get_logs&id=${assetId}&t=${new Date().getTime()}`);
                 const logs = await response.json();
                 
-                // คำนวณความถี่ตัวคูณทางสถิติ
-                const useCount = logs.filter(l => l.ActionType === 'use').length;
-                const chargeCount = logs.filter(l => l.ActionType === 'charge').length;
-                const batteryCount = logs.filter(l => l.ActionType === 'battery').length;
+                // กรองและคัดแยกข้อมูลประวัติตามประเภทงาน พร้อมจัดลำดับวันล่าสุดขึ้นก่อน
+                const useLogs = logs.filter(l => l.ActionType === 'use').sort((a,b) => new Date(b.Date) - new Date(a.Date));
+                const chargeLogs = logs.filter(l => l.ActionType === 'charge').sort((a,b) => new Date(b.Date) - new Date(a.Date));
+                const batteryLogs = logs.filter(l => l.ActionType === 'battery').sort((a,b) => new Date(b.Date) - new Date(a.Date));
                 
-                document.getElementById('stat-use-count').innerText = useCount;
-                document.getElementById('stat-charge-count').innerText = chargeCount;
-                document.getElementById('stat-battery-count').innerText = batteryCount;
+                // สรุปสถิติความถี่ด้านบน
+                document.getElementById('stat-use-count').innerText = useLogs.length;
+                document.getElementById('stat-charge-count').innerText = chargeLogs.length;
+                document.getElementById('stat-battery-count').innerText = batteryLogs.length;
                 
-                tbody.innerHTML = '';
-                if(logs.length === 0) { tbody.innerHTML = '<tr><td colspan="4" class="text-center">ยังไม่มีประวัติการบันทึกเครื่องนี้</td></tr>'; return; }
-                
-                // จัดลำดับเอาประวัติวันล่าสุดขึ้นมาก่อน
-                logs.sort((a,b) => new Date(b.Date) - new Date(a.Date));
-                
-                logs.forEach(log => {
-                    const tr = document.createElement('tr');
-                    tr.id = `log-row-${log.rowIndex}`;
-                    
-                    let actBadge = '';
-                    if(log.ActionType === 'use') actBadge = '<span class="status-badge status-normal">🔵 เตรียมเครื่อง</span>';
-                    else if(log.ActionType === 'charge') actBadge = '<span class="status-badge status-danger">🔴 ชาร์จกระตุ้น</span>';
-                    else if(log.ActionType === 'battery') actBadge = '<span class="status-badge status-broken" style="background:#2ECC71">🟢 เปลี่ยนแบต</span>';
+                // 1. เรนเดอร์ตารางประวัติเตรียมเครื่อง
+                tbodyUse.innerHTML = '';
+                if(useLogs.length === 0) {
+                    tbodyUse.innerHTML = '<tr><td colspan="3" class="text-center" style="color:#888; padding:15px;">ยังไม่มีประวัติการเตรียมเครื่อง</td></tr>';
+                } else {
+                    useLogs.forEach(log => tbodyUse.appendChild(createLogRowHTML(log)));
+                }
 
-                    tr.innerHTML = `
-                        <td>${new Date(log.Date).toLocaleDateString('th-TH')}</td>
-                        <td>${actBadge}</td>
-                        <td>${log.Notes || '-'}</td>
-                        <td class="text-center">
-                            <button class="btn btn-edit" style="padding:2px 6px; font-size:0.75em;" onclick="inlineEditLog('${log.AssetID}', ${log.rowIndex}, '${log.Date.split('T')[0]}', '${log.Notes}')">แก้ไข</button>
-                            <button class="btn btn-charge" style="padding:2px 6px; font-size:0.75em;" onclick="deleteLogEntry('${log.AssetID}', ${log.rowIndex})">ลบ</button>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-            } catch (error) { tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="color:red;">โหลดล้มเหลว</td></tr>'; }
+                // 2. เรนเดอร์ตารางประวัติชาร์จกระตุ้น
+                tbodyCharge.innerHTML = '';
+                if(chargeLogs.length === 0) {
+                    tbodyCharge.innerHTML = '<tr><td colspan="3" class="text-center" style="color:#888; padding:15px;">ยังไม่มีประวัติการชาร์จกระตุ้นแบตเตอรี่</td></tr>';
+                } else {
+                    chargeLogs.forEach(log => tbodyCharge.appendChild(createLogRowHTML(log)));
+                }
+
+                // 3. เรนเดอร์ตารางประวัติการเปลี่ยนแบตเตอรี่
+                tbodyBattery.innerHTML = '';
+                if(batteryLogs.length === 0) {
+                    tbodyBattery.innerHTML = '<tr><td colspan="3" class="text-center" style="color:#888; padding:15px;">ยังไม่มีประวัติการเปลี่ยนแบตเตอรี่ใหม่</td></tr>';
+                } else {
+                    batteryLogs.forEach(log => tbodyBattery.appendChild(createLogRowHTML(log)));
+                }
+                
+            } catch (error) { 
+                const errHTML = '<tr><td colspan="3" class="text-center" style="color:red;">โหลดล้มเหลว</td></tr>';
+                tbodyUse.innerHTML = errHTML; tbodyCharge.innerHTML = errHTML; tbodyBattery.innerHTML = errHTML;
+            }
         }
 
         async function addNewLogEntry() {
@@ -352,16 +404,15 @@
                 let note = type === 'battery' ? 'เปลี่ยนแบตเตอรี่ใหม่' : (type === 'use' ? 'เจ้าหน้าที่นำไปต่อเตรียมเครื่อง' : 'ชาร์จกระตุ้นแบตเตอรี่');
                 await fetch(`${API_URL}?action=${type}&id=${id}&date=${date}&notes=${encodeURIComponent(note)}`);
                 await fetchLogHistory(id);
-                await fetchData(); // รีเฟรชตารางหลักเผื่อวันล่าสุดเปลี่ยน
+                await fetchData(); 
             } catch(e) { alert('บันทึกไม่สำเร็จ'); }
         }
 
         function inlineEditLog(assetId, rowIndex, currentDate, currentNotes) {
             const tr = document.getElementById(`log-row-${rowIndex}`);
             tr.innerHTML = `
-                <td><input type="date" id="inline-date-${rowIndex}" value="${currentDate}" class="date-input" style="padding:2px; font-size:0.85em;"></td>
-                <td><small style="color:#888;">ห้ามเปลี่ยนประเภท</small></td>
-                <td><input type="text" id="inline-notes-${rowIndex}" value="${currentNotes}" style="width:90%; padding:3px; font-family:'Prompt'; font-size:0.85em;"></td>
+                <td><input type="date" id="inline-date-${rowIndex}" value="${currentDate}" class="date-input" style="padding:2px; font-size:0.85em; width:90%;"></td>
+                <td><input type="text" id="inline-notes-${rowIndex}" value="${currentNotes}" style="width:95%; padding:4px; font-family:'Prompt'; font-size:0.85em;"></td>
                 <td class="text-center">
                     <button class="btn btn-use" style="padding:2px 6px; font-size:0.75em;" onclick="submitInlineEdit('${assetId}', ${rowIndex})">บันทึก</button>
                     <button class="btn btn-charge" style="padding:2px 6px; font-size:0.75em;" onclick="fetchLogHistory('${assetId}')">ยกเลิก</button>
@@ -382,7 +433,7 @@
         }
 
         async function deleteLogEntry(assetId, rowIndex) {
-            if(!confirm("คุณต้องการลบรายการประวัติตามบรรทัดนี้ใช่หรือไม่? (คิวระบบหลักจะคำนวณใหม่)")) return;
+            if(!confirm("คุณต้องการลบรายการประวัติตามบรรทัดนี้ใช่หรือไม่?")) return;
             try {
                 await fetch(`${API_URL}?action=delete_log&rowIndex=${rowIndex}&id=${assetId}`);
                 await fetchLogHistory(assetId);
