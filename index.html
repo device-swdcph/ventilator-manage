@@ -216,6 +216,22 @@
                 </table>
             </div>
 
+            <div id="log-other-section" style="display:none;">
+                <div class="history-sub-title" style="color: #7F8C8D; border-left: 4px solid #7F8C8D;">⚪ ประวัติอื่นๆ ที่ไม่ตรงประเภทที่กำหนด</div>
+                <div class="table-responsive" style="max-height: 160px; overflow-y: auto;">
+                    <table style="min-width: 100%;">
+                        <thead>
+                            <tr style="background:#F2F4F4; color:#333;">
+                                <th width="30%">วันที่ปฏิบัติงาน</th>
+                                <th width="50%">รายละเอียด</th>
+                                <th width="20%" class="text-center">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="log-other-rows"></tbody>
+                    </table>
+                </div>
+            </div>
+
         </div>
     </div>
 
@@ -317,7 +333,7 @@
             } catch (error) { alert("เกิดข้อผิดพลาด"); }
         }
 
-        // === 📜 ระบบจัดการประวัติย้อนหลัง แบบแยกออกเป็น 3 ตาราง ===
+        // === 📜 ระบบจัดการประวัติย้อนหลัง แบบแยกออกเป็นตารางตามประเภท (+ ตาราง "อื่นๆ" สำหรับรายการที่ไม่ตรงประเภทหลัก) ===
         async function openHistoryModal(assetId) {
             document.getElementById('history-asset-id').value = assetId;
             document.getElementById('history-asset-title').innerText = `[${assetId}]`;
@@ -326,44 +342,76 @@
             await fetchLogHistory(assetId);
         }
 
-        // ฟังก์ชันช่วยสร้างแถวประวัติ (ใช้ร่วมกันทั้ง 3 ตาราง)
+        // Escape ค่าก่อนแทรกลง HTML/attribute เพื่อกันข้อความ (เช่น Notes ที่มี ' หรือ ") ทำให้ markup พัง
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+
+        // ฟังก์ชันช่วยสร้างแถวประวัติ (ใช้ร่วมกันทุกตาราง)
+        // เก็บค่าที่จำเป็นไว้ใน data-* ของ <tr> แทนการฝังลงใน onclick string โดยตรง
+        // เพื่อไม่ให้ค่าที่มี ' หรือ " (เช่นใน Notes) ทำให้ HTML/JS ที่ generate ออกมาผิด syntax
         function createLogRowHTML(log) {
             const tr = document.createElement('tr');
             tr.id = `log-row-${log.rowIndex}`;
+            tr.dataset.assetId = log.AssetID;
+            tr.dataset.rowIndex = log.rowIndex;
+            tr.dataset.date = log.Date.split('T')[0];
+            tr.dataset.notes = log.Notes || '';
             tr.innerHTML = `
                 <td>${new Date(log.Date).toLocaleDateString('th-TH')}</td>
-                <td>${log.Notes || '-'}</td>
+                <td>${escapeHtml(log.Notes) || '-'}</td>
                 <td class="text-center">
-                    <button class="btn btn-edit" style="padding:2px 6px; font-size:0.75em;" onclick="inlineEditLog('${log.AssetID}', ${log.rowIndex}, '${log.Date.split('T')[0]}', '${log.Notes}')">แก้ไข</button>
-                    <button class="btn btn-charge" style="padding:2px 6px; font-size:0.75em;" onclick="deleteLogEntry('${log.AssetID}', ${log.rowIndex})">ลบ</button>
+                    <button class="btn btn-edit" style="padding:2px 6px; font-size:0.75em;" onclick="inlineEditLog(this.closest('tr'))">แก้ไข</button>
+                    <button class="btn btn-charge" style="padding:2px 6px; font-size:0.75em;" onclick="deleteLogEntry(this.closest('tr'))">ลบ</button>
                 </td>
             `;
             return tr;
+        }
+
+        // ตัด whitespace/แปลงเป็นตัวพิมพ์เล็กก่อนเทียบ ป้องกันข้อมูลหลุดจากทั้ง 3 ประเภทเพราะตัวพิมพ์/ช่องว่างต่างกัน
+        function normalizeActionType(type) {
+            return (type || '').toString().trim().toLowerCase();
         }
 
         async function fetchLogHistory(assetId) {
             const tbodyUse = document.getElementById('log-use-rows');
             const tbodyCharge = document.getElementById('log-charge-rows');
             const tbodyBattery = document.getElementById('log-battery-rows');
-            
+            const otherSection = document.getElementById('log-other-section');
+            const tbodyOther = document.getElementById('log-other-rows');
+
             tbodyUse.innerHTML = '<tr><td colspan="3" class="text-center">กำลังเรียกประวัติ...</td></tr>';
             tbodyCharge.innerHTML = '<tr><td colspan="3" class="text-center">กำลังเรียกประวัติ...</td></tr>';
             tbodyBattery.innerHTML = '<tr><td colspan="3" class="text-center">กำลังเรียกประวัติ...</td></tr>';
-            
+            otherSection.style.display = 'none';
+
             try {
                 const response = await fetch(`${API_URL}?action=get_logs&id=${assetId}&t=${new Date().getTime()}`);
                 const logs = await response.json();
-                
-                // กรองและคัดแยกข้อมูลประวัติตามประเภทงาน พร้อมจัดลำดับวันล่าสุดขึ้นก่อน
-                const useLogs = logs.filter(l => l.ActionType === 'use').sort((a,b) => new Date(b.Date) - new Date(a.Date));
-                const chargeLogs = logs.filter(l => l.ActionType === 'charge').sort((a,b) => new Date(b.Date) - new Date(a.Date));
-                const batteryLogs = logs.filter(l => l.ActionType === 'battery').sort((a,b) => new Date(b.Date) - new Date(a.Date));
-                
+
+                // กรองและคัดแยกข้อมูลประวัติตามประเภทงาน โดยรายการที่ไม่ตรงกับ 3 ประเภทหลัก
+                // จะเก็บไว้ใน otherLogs แทนที่จะถูกทิ้งไปเงียบๆ
+                const useLogs = [], chargeLogs = [], batteryLogs = [], otherLogs = [];
+                logs.forEach(log => {
+                    const type = normalizeActionType(log.ActionType);
+                    if (type === 'use') useLogs.push(log);
+                    else if (type === 'charge') chargeLogs.push(log);
+                    else if (type === 'battery') batteryLogs.push(log);
+                    else otherLogs.push(log);
+                });
+                const byDateDesc = (a, b) => new Date(b.Date) - new Date(a.Date);
+                useLogs.sort(byDateDesc);
+                chargeLogs.sort(byDateDesc);
+                batteryLogs.sort(byDateDesc);
+                otherLogs.sort(byDateDesc);
+
                 // สรุปสถิติความถี่ด้านบน
                 document.getElementById('stat-use-count').innerText = useLogs.length;
                 document.getElementById('stat-charge-count').innerText = chargeLogs.length;
                 document.getElementById('stat-battery-count').innerText = batteryLogs.length;
-                
+
                 // 1. เรนเดอร์ตารางประวัติเตรียมเครื่อง
                 tbodyUse.innerHTML = '';
                 if(useLogs.length === 0) {
@@ -387,10 +435,20 @@
                 } else {
                     batteryLogs.forEach(log => tbodyBattery.appendChild(createLogRowHTML(log)));
                 }
-                
-            } catch (error) { 
+
+                // 4. เรนเดอร์ตารางประวัติที่ไม่ตรงกับ 3 ประเภทหลัก (แสดงเฉพาะเมื่อมีข้อมูล)
+                if (otherLogs.length === 0) {
+                    otherSection.style.display = 'none';
+                } else {
+                    otherSection.style.display = '';
+                    tbodyOther.innerHTML = '';
+                    otherLogs.forEach(log => tbodyOther.appendChild(createLogRowHTML(log)));
+                }
+
+            } catch (error) {
                 const errHTML = '<tr><td colspan="3" class="text-center" style="color:red;">โหลดล้มเหลว</td></tr>';
                 tbodyUse.innerHTML = errHTML; tbodyCharge.innerHTML = errHTML; tbodyBattery.innerHTML = errHTML;
+                otherSection.style.display = 'none';
             }
         }
 
@@ -408,23 +466,30 @@
             } catch(e) { alert('บันทึกไม่สำเร็จ'); }
         }
 
-        function inlineEditLog(assetId, rowIndex, currentDate, currentNotes) {
-            const tr = document.getElementById(`log-row-${rowIndex}`);
+        // รับ <tr> แล้วอ่านค่าจาก dataset (ตั้งไว้ตอนสร้างแถวใน createLogRowHTML)
+        // แทนการรับ currentDate/currentNotes ที่ถูกฝังเป็น string ใน onclick ตรงๆ
+        function inlineEditLog(tr) {
+            const { assetId, rowIndex, date, notes } = tr.dataset;
             tr.innerHTML = `
-                <td><input type="date" id="inline-date-${rowIndex}" value="${currentDate}" class="date-input" style="padding:2px; font-size:0.85em; width:90%;"></td>
-                <td><input type="text" id="inline-notes-${rowIndex}" value="${currentNotes}" style="width:95%; padding:4px; font-family:'Prompt'; font-size:0.85em;"></td>
+                <td><input type="date" id="inline-date-${rowIndex}" value="${date}" class="date-input" style="padding:2px; font-size:0.85em; width:90%;"></td>
+                <td><input type="text" id="inline-notes-${rowIndex}" value="${escapeHtml(notes)}" style="width:95%; padding:4px; font-family:'Prompt'; font-size:0.85em;"></td>
                 <td class="text-center">
-                    <button class="btn btn-use" style="padding:2px 6px; font-size:0.75em;" onclick="submitInlineEdit('${assetId}', ${rowIndex})">บันทึก</button>
-                    <button class="btn btn-charge" style="padding:2px 6px; font-size:0.75em;" onclick="fetchLogHistory('${assetId}')">ยกเลิก</button>
+                    <button class="btn btn-use" style="padding:2px 6px; font-size:0.75em;" onclick="submitInlineEdit(this.closest('tr'))">บันทึก</button>
+                    <button class="btn btn-charge" style="padding:2px 6px; font-size:0.75em;" onclick="cancelInlineEdit(this.closest('tr'))">ยกเลิก</button>
                 </td>
             `;
         }
 
-        async function submitInlineEdit(assetId, rowIndex) {
+        function cancelInlineEdit(tr) {
+            fetchLogHistory(tr.dataset.assetId);
+        }
+
+        async function submitInlineEdit(tr) {
+            const { assetId, rowIndex } = tr.dataset;
             const newDate = document.getElementById(`inline-date-${rowIndex}`).value;
             const newNotes = document.getElementById(`inline-notes-${rowIndex}`).value;
             if(!newDate) { alert('กรุณาระบุวันที่'); return; }
-            
+
             try {
                 await fetch(`${API_URL}?action=edit_log&rowIndex=${rowIndex}&id=${assetId}&date=${newDate}&notes=${encodeURIComponent(newNotes)}`);
                 await fetchLogHistory(assetId);
@@ -432,7 +497,8 @@
             } catch (e) { alert('แก้ไขข้อมูลล้มเหลว'); }
         }
 
-        async function deleteLogEntry(assetId, rowIndex) {
+        async function deleteLogEntry(tr) {
+            const { assetId, rowIndex } = tr.dataset;
             if(!confirm("คุณต้องการลบรายการประวัติตามบรรทัดนี้ใช่หรือไม่?")) return;
             try {
                 await fetch(`${API_URL}?action=delete_log&rowIndex=${rowIndex}&id=${assetId}`);
