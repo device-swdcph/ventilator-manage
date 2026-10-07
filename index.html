@@ -62,9 +62,26 @@
 
         /* หัวข้อตารางย่อยในประวัติ */
         .history-sub-title { font-size: 1.05em; font-weight: 600; margin-top: 20px; margin-bottom: 10px; padding-left: 6px; }
+
+        /* สถานะกำลังโหลด / โหลดล้มเหลว */
+        .loading-cell { text-align: center; padding: 30px 15px; color: #777; }
+        .error-cell { text-align: center; padding: 25px 15px; color: var(--color-red); }
+        .spinner { display: inline-block; width: 18px; height: 18px; border: 3px solid #D6E4F5; border-top-color: var(--color-blue); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .slow-hint { display: none; font-size: 0.85em; color: #999; margin-top: 8px; }
+        .is-slow .slow-hint { display: block; }
+        .status-bar { display: none; position: fixed; top: 16px; right: 16px; z-index: 1100; max-width: 360px; background: white; color: var(--text-dark); padding: 10px 16px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-left: 4px solid var(--color-blue); font-size: 0.9em; }
+        .status-bar.show { display: block; }
+        .status-bar.error { border-left-color: var(--color-red); color: var(--color-red); }
+        .status-bar .btn { margin-top: 8px; }
+        .btn:disabled { opacity: 0.6; cursor: wait; }
+        .data-age { font-size: 0.85em; color: #888; margin-top: 6px; min-height: 1.2em; }
+        .data-age.stale { color: #B9770E; font-weight: 500; }
     </style>
 </head>
 <body>
+
+    <div id="statusBar" class="status-bar" role="status" aria-live="polite"></div>
 
     <div class="header-container">
         <img src="https://lh3.googleusercontent.com/d/1DlsLtw43ZhgFrmvjS6ySFH4EmSwuS0tk" alt="โลโก้" class="hospital-logo">
@@ -76,6 +93,7 @@
 
     <div class="search-container">
         <input type="text" id="searchInput" class="search-box" placeholder="🔍 ค้นหาครุภัณฑ์, Serial หรือรุ่นเครื่อง..." onkeyup="searchData()">
+        <div id="dataAge" class="data-age"></div>
     </div>
     
     <div>
@@ -91,7 +109,7 @@
                         <th width="20%" class="text-center">จัดการ</th>
                     </tr>
                 </thead>
-                <tbody id="use-list"></tbody>
+                <tbody id="use-list"><tr><td colspan="5" class="loading-cell"><span class="spinner"></span>กำลังโหลดข้อมูล...</td></tr></tbody>
             </table>
         </div>
     </div>
@@ -109,7 +127,7 @@
                         <th width="20%" class="text-center">จัดการ</th>
                     </tr>
                 </thead>
-                <tbody id="charge-list"></tbody>
+                <tbody id="charge-list"><tr><td colspan="5" class="loading-cell"><span class="spinner"></span>กำลังโหลดข้อมูล...</td></tr></tbody>
             </table>
         </div>
     </div>
@@ -126,7 +144,7 @@
                         <th width="20%" class="text-center">จัดการ</th>
                     </tr>
                 </thead>
-                <tbody id="broken-list"></tbody>
+                <tbody id="broken-list"><tr><td colspan="4" class="loading-cell"><span class="spinner"></span>กำลังโหลดข้อมูล...</td></tr></tbody>
             </table>
         </div>
     </div>
@@ -143,7 +161,7 @@
             </div>
             <div class="form-group" id="symptom-group" style="display:none;"><label>อาการชำรุด:</label><input type="text" id="modal-symptom"></div>
             <div class="form-group"><label>วันที่รับเครื่องมา:</label><input type="date" id="modal-receive"></div>
-            <button class="btn btn-use" style="width:100%; margin-top:10px;" onclick="saveMachineInfo()">บันทึกข้อมูลหลัก</button>
+            <button class="btn btn-use" style="width:100%; margin-top:10px;" onclick="saveMachineInfo(this)">บันทึกข้อมูลหลัก</button>
         </div>
     </div>
 
@@ -170,7 +188,7 @@
                         </select>
                     </div>
                     <div><label style="font-size:0.85em; font-weight:500;">วันที่ปฏิบัติงาน:</label><input type="date" id="new-log-date"></div>
-                    <button class="btn btn-use" onclick="addNewLogEntry()">➕ ลงประวัติ</button>
+                    <button class="btn btn-use" onclick="addNewLogEntry(this)">➕ ลงประวัติ</button>
                 </div>
             </fieldset>
 
@@ -239,6 +257,15 @@
         // ⭐️ นำ API URL จาก Google Sheets มาวางตรงนี้ครับ ⭐️
         const API_URL = 'https://script.google.com/macros/s/AKfycbxUISoKM4RLt5T9dnjN86-Q5WCEbytq5GhHJArvP3Azv0FhhYemSYvi9IbU6cVd2-R3Lw/exec';
         let globalData = [];
+        let hasLoaded = false;   // โหลดข้อมูลหลักสำเร็จอย่างน้อย 1 ครั้งแล้วหรือยัง
+        let fetchSeq = 0;        // ใช้ทิ้งผลลัพธ์ของ request เก่าที่ตอบกลับช้ากว่า request ใหม่
+        let logFetchSeq = 0;
+        const SLOW_LOAD_MS = 5000;
+        // เก็บข้อมูลชุดล่าสุดไว้ในเบราว์เซอร์ เปิดหน้าครั้งถัดไปจะแสดงได้ทันทีระหว่างรอข้อมูลใหม่
+        const CACHE_KEY = 'ventilator-manage:data:v1';
+        let dataTimestamp = null; // เวลาที่ได้ข้อมูลชุดที่กำลังแสดงจากเซิร์ฟเวอร์
+        let isStale = false;      // true = กำลังแสดงข้อมูลจาก cache ที่ยังไม่ได้ยืนยันกับเซิร์ฟเวอร์
+        const SLOW_HINT_TEXT = 'ระบบกำลังดึงข้อมูลจาก Google Sheets อาจใช้เวลา 10–20 วินาที กรุณารอสักครู่ ไม่ต้องรีเฟรชหน้า';
 
         function getTodayString() {
             const today = new Date();
@@ -246,15 +273,109 @@
             return new Date(today.getTime() - (offset * 60 * 1000)).toISOString().split('T')[0];
         }
 
+        function loadingRowHTML(colspan, text) {
+            return `<tr><td colspan="${colspan}" class="loading-cell"><span class="spinner"></span>${text}<span class="slow-hint">${SLOW_HINT_TEXT}</span></td></tr>`;
+        }
+
+        function errorRowHTML(colspan, text, retryJs) {
+            return `<tr><td colspan="${colspan}" class="error-cell">⚠️ ${text}<br><button class="btn btn-use" style="margin-top:10px;" onclick="${retryJs}">🔄 ลองใหม่อีกครั้ง</button></td></tr>`;
+        }
+
+        function showStatusBar(type, html) {
+            const bar = document.getElementById('statusBar');
+            bar.className = 'status-bar show' + (type === 'error' ? ' error' : '');
+            bar.innerHTML = html;
+        }
+
+        function hideStatusBar() {
+            document.getElementById('statusBar').className = 'status-bar';
+        }
+
+        function setMainTablesHTML(useHTML, chargeHTML, brokenHTML) {
+            document.getElementById('use-list').innerHTML = useHTML;
+            document.getElementById('charge-list').innerHTML = chargeHTML;
+            document.getElementById('broken-list').innerHTML = brokenHTML;
+        }
+
+        // localStorage อาจใช้ไม่ได้ (โหมดไม่ระบุตัวตน / ถูกบล็อก / พื้นที่เต็ม) จึงต้องครอบ try/catch ทุกครั้ง
+        function readCache() {
+            try {
+                const cached = JSON.parse(localStorage.getItem(CACHE_KEY));
+                if (cached && Array.isArray(cached.data) && cached.savedAt) return cached;
+            } catch (e) {}
+            return null;
+        }
+
+        function writeCache(data, savedAt) {
+            try { localStorage.setItem(CACHE_KEY, JSON.stringify({ data, savedAt })); } catch (e) {}
+        }
+
+        function formatDateTime(ts) {
+            return new Date(ts).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + ' น.';
+        }
+
+        function renderDataAge() {
+            const el = document.getElementById('dataAge');
+            if (!dataTimestamp) { el.textContent = ''; el.className = 'data-age'; return; }
+            el.className = 'data-age' + (isStale ? ' stale' : '');
+            el.textContent = isStale
+                ? `⚠️ กำลังแสดงข้อมูลที่บันทึกไว้เมื่อ ${formatDateTime(dataTimestamp)} (ยังไม่ใช่ข้อมูลล่าสุด)`
+                : `🕒 ข้อมูลล่าสุด ณ ${formatDateTime(dataTimestamp)}`;
+        }
+
+        function loadFromCache() {
+            const cached = readCache();
+            if (!cached) return false;
+            globalData = cached.data;
+            dataTimestamp = cached.savedAt;
+            isStale = true;
+            hasLoaded = true;
+            searchData();
+            renderDataAge();
+            return true;
+        }
+
         async function fetchData() {
+            const seq = ++fetchSeq;
+            // โหลดครั้งแรก: แสดงข้อความในตาราง / โหลดซ้ำหลังบันทึก: คงข้อมูลเดิมไว้แล้วแสดงแถบสถานะมุมขวาบน
+            if (!hasLoaded) {
+                setMainTablesHTML(loadingRowHTML(5, 'กำลังโหลดข้อมูล...'), loadingRowHTML(5, 'กำลังโหลดข้อมูล...'), loadingRowHTML(4, 'กำลังโหลดข้อมูล...'));
+            }
+            showStatusBar('loading', `<span class="spinner"></span>${hasLoaded ? 'กำลังอัปเดตข้อมูลล่าสุด...' : 'กำลังโหลดข้อมูล...'}<span class="slow-hint">${SLOW_HINT_TEXT}</span>`);
+            const slowTimer = setTimeout(() => document.body.classList.add('is-slow'), SLOW_LOAD_MS);
+
             try {
                 const response = await fetch(API_URL + "?t=" + new Date().getTime());
-                globalData = await response.json();
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                if (seq !== fetchSeq) return;
+                globalData = Array.isArray(data) ? data : [];
+                hasLoaded = true;
+                isStale = false;
+                dataTimestamp = Date.now();
+                writeCache(globalData, dataTimestamp);
+                hideStatusBar();
                 searchData();
-            } catch (error) { console.error("Error:", error); }
+                renderDataAge();
+            } catch (error) {
+                console.error("Error:", error);
+                if (seq !== fetchSeq) return;
+                if (!hasLoaded) {
+                    const msg = 'โหลดข้อมูลไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ต';
+                    setMainTablesHTML(errorRowHTML(5, msg, 'fetchData()'), errorRowHTML(5, msg, 'fetchData()'), errorRowHTML(4, msg, 'fetchData()'));
+                }
+                const failMsg = !hasLoaded ? 'โหลดข้อมูลไม่สำเร็จ'
+                    : isStale ? `เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ กำลังแสดงข้อมูลเก่าเมื่อ ${formatDateTime(dataTimestamp)}`
+                    : 'อัปเดตข้อมูลล่าสุดไม่สำเร็จ (ข้อมูลที่แสดงอาจไม่เป็นปัจจุบัน)';
+                showStatusBar('error', `⚠️ ${failMsg}<br><button class="btn btn-use" onclick="fetchData()">🔄 ลองใหม่</button> <button class="btn btn-charge" onclick="hideStatusBar()">ปิด</button>`);
+            } finally {
+                clearTimeout(slowTimer);
+                if (seq === fetchSeq) document.body.classList.remove('is-slow');
+            }
         }
 
         function searchData() {
+            if (!hasLoaded) return; // ยังโหลดไม่เสร็จ อย่าเพิ่งแสดง "ไม่มีข้อมูล"
             const query = document.getElementById('searchInput').value.toLowerCase();
             const filteredData = globalData.filter(item => {
                 return (item.AssetID||'').toString().toLowerCase().includes(query) || 
@@ -319,18 +440,21 @@
             document.getElementById('symptom-group').style.display = (status === 'Broken') ? 'block' : 'none';
         }
 
-        async function saveMachineInfo() {
+        async function saveMachineInfo(btn) {
             const id = document.getElementById('modal-id').value;
             const model = document.getElementById('modal-model').value;
             const status = document.getElementById('modal-status').value;
             const symptom = document.getElementById('modal-symptom').value;
             const receive = document.getElementById('modal-receive').value;
             
+            const originalText = btn.innerText;
+            btn.innerText = "⏳ กำลังบันทึก..."; btn.disabled = true;
             try {
                 await fetch(`${API_URL}?action=update_info&id=${id}&model=${encodeURIComponent(model)}&status=${status}&symptom=${encodeURIComponent(symptom)}&receivedate=${receive}`);
                 closeModal('editModal');
                 await fetchData(); 
             } catch (error) { alert("เกิดข้อผิดพลาด"); }
+            finally { btn.innerText = originalText; btn.disabled = false; }
         }
 
         // === 📜 ระบบจัดการประวัติย้อนหลัง แบบแยกออกเป็นตารางตามประเภท (+ ตาราง "อื่นๆ" สำหรับรายการที่ไม่ตรงประเภทหลัก) ===
@@ -382,14 +506,21 @@
             const otherSection = document.getElementById('log-other-section');
             const tbodyOther = document.getElementById('log-other-rows');
 
-            tbodyUse.innerHTML = '<tr><td colspan="3" class="text-center">กำลังเรียกประวัติ...</td></tr>';
-            tbodyCharge.innerHTML = '<tr><td colspan="3" class="text-center">กำลังเรียกประวัติ...</td></tr>';
-            tbodyBattery.innerHTML = '<tr><td colspan="3" class="text-center">กำลังเรียกประวัติ...</td></tr>';
+            const seq = ++logFetchSeq;
+            const modal = document.getElementById('historyModal');
+            const loadingHTML = loadingRowHTML(3, 'กำลังเรียกประวัติ...');
+            tbodyUse.innerHTML = loadingHTML;
+            tbodyCharge.innerHTML = loadingHTML;
+            tbodyBattery.innerHTML = loadingHTML;
             otherSection.style.display = 'none';
+            ['stat-use-count', 'stat-charge-count', 'stat-battery-count'].forEach(id => document.getElementById(id).innerText = '…');
+            const slowTimer = setTimeout(() => modal.classList.add('is-slow'), SLOW_LOAD_MS);
 
             try {
                 const response = await fetch(`${API_URL}?action=get_logs&id=${assetId}&t=${new Date().getTime()}`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const logs = await response.json();
+                if (seq !== logFetchSeq) return; // ผู้ใช้เปิดประวัติเครื่องอื่นไปแล้ว
 
                 // กรองและคัดแยกข้อมูลประวัติตามประเภทงาน โดยรายการที่ไม่ตรงกับ 3 ประเภทหลัก
                 // จะเก็บไว้ใน otherLogs แทนที่จะถูกทิ้งไปเงียบๆ
@@ -446,24 +577,31 @@
                 }
 
             } catch (error) {
-                const errHTML = '<tr><td colspan="3" class="text-center" style="color:red;">โหลดล้มเหลว</td></tr>';
+                if (seq !== logFetchSeq) return;
+                const errHTML = errorRowHTML(3, 'โหลดประวัติไม่สำเร็จ', "fetchLogHistory(document.getElementById('history-asset-id').value)");
                 tbodyUse.innerHTML = errHTML; tbodyCharge.innerHTML = errHTML; tbodyBattery.innerHTML = errHTML;
                 otherSection.style.display = 'none';
+            } finally {
+                clearTimeout(slowTimer);
+                if (seq === logFetchSeq) modal.classList.remove('is-slow');
             }
         }
 
-        async function addNewLogEntry() {
+        async function addNewLogEntry(btn) {
             const id = document.getElementById('history-asset-id').value;
             const type = document.getElementById('new-log-type').value;
             const date = document.getElementById('new-log-date').value;
             if(!date) { alert('กรุณาระบุวันที่'); return; }
             
+            const originalText = btn.innerText;
+            btn.innerText = "⏳ กำลังบันทึก..."; btn.disabled = true;
             try {
                 let note = type === 'battery' ? 'เปลี่ยนแบตเตอรี่ใหม่' : (type === 'use' ? 'เจ้าหน้าที่นำไปต่อเตรียมเครื่อง' : 'ชาร์จกระตุ้นแบตเตอรี่');
                 await fetch(`${API_URL}?action=${type}&id=${id}&date=${date}&notes=${encodeURIComponent(note)}`);
                 await fetchLogHistory(id);
                 await fetchData(); 
             } catch(e) { alert('บันทึกไม่สำเร็จ'); }
+            finally { btn.innerText = originalText; btn.disabled = false; }
         }
 
         // รับ <tr> แล้วอ่านค่าจาก dataset (ตั้งไว้ตอนสร้างแถวใน createLogRowHTML)
@@ -615,6 +753,7 @@
             });
         }
 
+        loadFromCache();
         fetchData();
     </script>
 </body>
