@@ -75,6 +75,8 @@
         .status-bar.error { border-left-color: var(--color-red); color: var(--color-red); }
         .status-bar .btn { margin-top: 8px; }
         .btn:disabled { opacity: 0.6; cursor: wait; }
+        .data-age { font-size: 0.85em; color: #888; margin-top: 6px; min-height: 1.2em; }
+        .data-age.stale { color: #B9770E; font-weight: 500; }
     </style>
 </head>
 <body>
@@ -91,6 +93,7 @@
 
     <div class="search-container">
         <input type="text" id="searchInput" class="search-box" placeholder="🔍 ค้นหาครุภัณฑ์, Serial หรือรุ่นเครื่อง..." onkeyup="searchData()">
+        <div id="dataAge" class="data-age"></div>
     </div>
     
     <div>
@@ -258,6 +261,10 @@
         let fetchSeq = 0;        // ใช้ทิ้งผลลัพธ์ของ request เก่าที่ตอบกลับช้ากว่า request ใหม่
         let logFetchSeq = 0;
         const SLOW_LOAD_MS = 5000;
+        // เก็บข้อมูลชุดล่าสุดไว้ในเบราว์เซอร์ เปิดหน้าครั้งถัดไปจะแสดงได้ทันทีระหว่างรอข้อมูลใหม่
+        const CACHE_KEY = 'ventilator-manage:data:v1';
+        let dataTimestamp = null; // เวลาที่ได้ข้อมูลชุดที่กำลังแสดงจากเซิร์ฟเวอร์
+        let isStale = false;      // true = กำลังแสดงข้อมูลจาก cache ที่ยังไม่ได้ยืนยันกับเซิร์ฟเวอร์
         const SLOW_HINT_TEXT = 'ระบบกำลังดึงข้อมูลจาก Google Sheets อาจใช้เวลา 10–20 วินาที กรุณารอสักครู่ ไม่ต้องรีเฟรชหน้า';
 
         function getTodayString() {
@@ -290,6 +297,44 @@
             document.getElementById('broken-list').innerHTML = brokenHTML;
         }
 
+        // localStorage อาจใช้ไม่ได้ (โหมดไม่ระบุตัวตน / ถูกบล็อก / พื้นที่เต็ม) จึงต้องครอบ try/catch ทุกครั้ง
+        function readCache() {
+            try {
+                const cached = JSON.parse(localStorage.getItem(CACHE_KEY));
+                if (cached && Array.isArray(cached.data) && cached.savedAt) return cached;
+            } catch (e) {}
+            return null;
+        }
+
+        function writeCache(data, savedAt) {
+            try { localStorage.setItem(CACHE_KEY, JSON.stringify({ data, savedAt })); } catch (e) {}
+        }
+
+        function formatDateTime(ts) {
+            return new Date(ts).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + ' น.';
+        }
+
+        function renderDataAge() {
+            const el = document.getElementById('dataAge');
+            if (!dataTimestamp) { el.textContent = ''; el.className = 'data-age'; return; }
+            el.className = 'data-age' + (isStale ? ' stale' : '');
+            el.textContent = isStale
+                ? `⚠️ กำลังแสดงข้อมูลที่บันทึกไว้เมื่อ ${formatDateTime(dataTimestamp)} (ยังไม่ใช่ข้อมูลล่าสุด)`
+                : `🕒 ข้อมูลล่าสุด ณ ${formatDateTime(dataTimestamp)}`;
+        }
+
+        function loadFromCache() {
+            const cached = readCache();
+            if (!cached) return false;
+            globalData = cached.data;
+            dataTimestamp = cached.savedAt;
+            isStale = true;
+            hasLoaded = true;
+            searchData();
+            renderDataAge();
+            return true;
+        }
+
         async function fetchData() {
             const seq = ++fetchSeq;
             // โหลดครั้งแรก: แสดงข้อความในตาราง / โหลดซ้ำหลังบันทึก: คงข้อมูลเดิมไว้แล้วแสดงแถบสถานะมุมขวาบน
@@ -306,8 +351,12 @@
                 if (seq !== fetchSeq) return;
                 globalData = Array.isArray(data) ? data : [];
                 hasLoaded = true;
+                isStale = false;
+                dataTimestamp = Date.now();
+                writeCache(globalData, dataTimestamp);
                 hideStatusBar();
                 searchData();
+                renderDataAge();
             } catch (error) {
                 console.error("Error:", error);
                 if (seq !== fetchSeq) return;
@@ -315,7 +364,10 @@
                     const msg = 'โหลดข้อมูลไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ต';
                     setMainTablesHTML(errorRowHTML(5, msg, 'fetchData()'), errorRowHTML(5, msg, 'fetchData()'), errorRowHTML(4, msg, 'fetchData()'));
                 }
-                showStatusBar('error', `⚠️ ${hasLoaded ? 'อัปเดตข้อมูลล่าสุดไม่สำเร็จ (ข้อมูลที่แสดงอาจไม่เป็นปัจจุบัน)' : 'โหลดข้อมูลไม่สำเร็จ'}<br><button class="btn btn-use" onclick="fetchData()">🔄 ลองใหม่</button> <button class="btn btn-charge" onclick="hideStatusBar()">ปิด</button>`);
+                const failMsg = !hasLoaded ? 'โหลดข้อมูลไม่สำเร็จ'
+                    : isStale ? `เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ กำลังแสดงข้อมูลเก่าเมื่อ ${formatDateTime(dataTimestamp)}`
+                    : 'อัปเดตข้อมูลล่าสุดไม่สำเร็จ (ข้อมูลที่แสดงอาจไม่เป็นปัจจุบัน)';
+                showStatusBar('error', `⚠️ ${failMsg}<br><button class="btn btn-use" onclick="fetchData()">🔄 ลองใหม่</button> <button class="btn btn-charge" onclick="hideStatusBar()">ปิด</button>`);
             } finally {
                 clearTimeout(slowTimer);
                 if (seq === fetchSeq) document.body.classList.remove('is-slow');
@@ -701,6 +753,7 @@
             });
         }
 
+        loadFromCache();
         fetchData();
     </script>
 </body>
