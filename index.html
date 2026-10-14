@@ -75,6 +75,9 @@
         .status-bar.error { border-left-color: var(--color-red); color: var(--color-red); }
         .status-bar .btn { margin-top: 8px; }
         .btn:disabled { opacity: 0.6; cursor: wait; }
+        .btn-copy { background: none; border: 1px solid #D5DBDB; border-radius: 4px; padding: 1px 6px; margin-left: 4px; font-size: 0.8em; color: #5D6D7E; cursor: pointer; vertical-align: middle; font-family: 'Prompt', sans-serif; transition: 0.2s; }
+        .btn-copy:hover { background: #EBF5FB; border-color: var(--color-blue); color: var(--color-blue); }
+        .btn-copy.copied { background: #E8F8F5; border-color: #2ECC71; color: #117A65; }
         .data-age { font-size: 0.85em; color: #888; margin-top: 6px; min-height: 1.2em; }
         .data-age.stale { color: #B9770E; font-weight: 500; }
     </style>
@@ -658,9 +661,38 @@
             } catch (error) { alert("เกิดข้อผิดพลาด"); buttonElement.innerText = originalText; buttonElement.disabled = false; }
         }
 
+        // ปุ่มคัดลอกเลขครุภัณฑ์ (เก็บค่าไว้ใน data-copy แทนการฝังลง onclick ตรงๆ)
+        function copyButtonHTML(value) {
+            if (!value) return '';
+            return `<button type="button" class="btn-copy" data-copy="${escapeHtml(value)}" onclick="copyFromButton(this)" title="คัดลอกเลขครุภัณฑ์" aria-label="คัดลอกเลขครุภัณฑ์">📋 คัดลอก</button>`;
+        }
+
+        async function copyFromButton(btn) {
+            const text = btn.dataset.copy;
+            let ok = false;
+            try {
+                await navigator.clipboard.writeText(text);
+                ok = true;
+            } catch (e) {
+                // สำรองสำหรับเบราว์เซอร์ที่ใช้ Clipboard API ไม่ได้ (เช่น เปิดผ่าน http หรือไฟล์ในเครื่อง)
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed'; ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                try { ok = document.execCommand('copy'); } catch (err) {}
+                document.body.removeChild(ta);
+            }
+            if (!ok) { prompt('คัดลอกเลขครุภัณฑ์ด้วยตนเอง (Ctrl+C):', text); return; }
+            btn.textContent = '✔️ คัดลอกแล้ว';
+            btn.classList.add('copied');
+            clearTimeout(btn._copyTimer);
+            btn._copyTimer = setTimeout(() => { btn.textContent = '📋 คัดลอก'; btn.classList.remove('copied'); }, 1500);
+        }
+
         function getMachineInfoHTML(item) {
             return `
-                <strong>${item.AssetID || '-'}</strong> <small style="color:#666;">(SN: ${item.SerialNumber || '-'})</small>
+                <strong>${item.AssetID || '-'}</strong>${copyButtonHTML(item.AssetID)} <small style="color:#666;">(SN: ${item.SerialNumber || '-'})</small>
                 <span class="info-text" style="color:var(--color-blue); font-weight:500;">📝 รุ่น: ${item.Model || 'ยังไม่ระบุรุ่น'}</span>
                 <span class="info-text">⚙️ อายุเครื่อง: ${calculateAgeText(item.ReceiveDate)} | 🔋 อายุแบต: ${calculateAgeText(item.BatteryDate)}</span>
                 <button class="btn btn-edit" onclick="openEditModal('${item.AssetID}')">✏️ แก้ไขข้อมูล</button>
@@ -744,7 +776,7 @@
             items.forEach(item => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td><strong>${item.AssetID || '-'}</strong><br><small style="color:var(--color-blue)">รุ่น: ${item.Model || '-'}</small><br><small style="color:#777;">SN: ${item.SerialNumber || '-'}</small></td>
+                    <td><strong>${item.AssetID || '-'}</strong>${copyButtonHTML(item.AssetID)}<br><small style="color:var(--color-blue)">รุ่น: ${item.Model || '-'}</small><br><small style="color:#777;">SN: ${item.SerialNumber || '-'}</small></td>
                     <td><span class="status-badge status-broken">ชำรุด</span><br><span style="color:var(--color-red); font-weight:500;">${item.Symptom || 'ไม่ระบุอาการ'}</span></td>
                     <td><span class="info-text">อายุเครื่อง: ${calculateAgeText(item.ReceiveDate)}</span><span class="info-text">อายุแบต: ${calculateAgeText(item.BatteryDate)}</span></td>
                     <td class="text-center"><button class="btn btn-edit" onclick="openEditModal('${item.AssetID}')">✏️ อัปเดตสถานะ</button><button class="btn btn-history" onclick="openHistoryModal('${item.AssetID}')">📜 ประวัติ</button></td>
